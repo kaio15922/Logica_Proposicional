@@ -1,7 +1,17 @@
 import javax.swing.*;
 import org.apache.commons.jexl3.*;
-import java.util.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+//import java.awt.event.*;
+import java.util.Arrays;
+
 
 public class Main extends JFrame {
     private String literal1 = "";
@@ -16,7 +26,7 @@ public class Main extends JFrame {
         setBounds(0, 0, 1000, 1000);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        JLabel titulo = new JLabel("Bem vindo ao fazedor de tabela verdade!");
+        JLabel titulo = new JLabel("Bem-vindo ao fazedor de tabela verdade!");
         titulo.setBounds(380, 0, 300, 30);
         add(titulo);
 
@@ -27,7 +37,7 @@ public class Main extends JFrame {
         JLabel instrucoes = new JLabel("<html>" +
             "Use os operadores corretamente com parênteses!<br>" +
             "AND = && &nbsp;&nbsp; OR = || &nbsp;&nbsp; NOT = !<br>" +
-            "IMPLICAÇÃO = -> &nbsp;&nbsp; BICONDICIONAL = <-><br>" +
+            "IMPLICAÇÃO = -> &nbsp;&nbsp; BICONDICIONAL = <-> ou ==<br>" +
             "Exemplo: (A && B) -> C" +
             "</html>");
         instrucoes.setBounds(350, 160, 400, 80);
@@ -49,6 +59,12 @@ public class Main extends JFrame {
         entrada4.setBounds(375, 300, 300, 30);
         add(entrada4);
 
+        JLabel resultadoLabel = new JLabel();
+        resultadoLabel.setBounds(375, 720, 300, 30);
+        resultadoLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        resultadoLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        add(resultadoLabel);
+
         JButton botao = new JButton("Clique aqui");
         botao.setBounds(450, 120, 100, 30);
         add(botao);
@@ -59,18 +75,17 @@ public class Main extends JFrame {
             String lit3 = entrada3.getText().trim();
             String lit4 = entrada4.getText().trim();
 
-            if (lit1.isEmpty() || lit2.isEmpty() || lit3.isEmpty()) 
-            {
+            if (lit1.isEmpty() || lit2.isEmpty() || lit3.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Erro: Preencha todos os campos de literal!", "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            if (!lit1.matches("[a-zA-Z]") || !lit2.matches("[a-zA-Z]") || !lit3.matches("[a-zA-Z]")) 
-            {
+
+            if (!lit1.matches("[a-zA-Z]") || !lit2.matches("[a-zA-Z]") || !lit3.matches("[a-zA-Z]")) {
                 JOptionPane.showMessageDialog(this, "Erro: Os literais devem ser letras de A-Z!", "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            if (lit4.isEmpty())
-            {
+
+            if (lit4.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Erro: Preencha o campo da expressão.", "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -78,20 +93,18 @@ public class Main extends JFrame {
             this.literal1 = lit1.toUpperCase();
             this.literal2 = lit2.toUpperCase();
             this.literal3 = lit3.toUpperCase();
-            this.literal4 = lit4.toUpperCase();
+            this.literal4 = lit4;
 
             List<String> variaveis = Arrays.asList(this.literal1, this.literal2, this.literal3);
 
-            String apenasLetras = this.literal4.replaceAll("[^A-Z]", "");
+            String apenasLetras = this.literal4.replaceAll("[^A-Za-z]", "");
             Set<String> letrasNaExpr = new HashSet<>();
-            for (char c : apenasLetras.toCharArray()) 
-            {
-                letrasNaExpr.add(String.valueOf(c));
+            for (char c : apenasLetras.toCharArray()) {
+                letrasNaExpr.add(String.valueOf(c).toUpperCase());
             }
-            for (String lit : letrasNaExpr) 
-            {
-                if (!variaveis.contains(lit)) 
-                {
+
+            for (String lit : letrasNaExpr) {
+                if (!variaveis.contains(lit)) {
                     JOptionPane.showMessageDialog(this, "Erro: A expressão contém o literal não declarado: " + lit, "Erro", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
@@ -101,6 +114,7 @@ public class Main extends JFrame {
             String expressao = SubstituirImplicacoes(expressaoOriginal);
 
             int linhas = 1 << variaveis.size();
+            List<Boolean> resultados = new ArrayList<>();
 
             StringBuilder sb = new StringBuilder();
             sb.append("Expressão: ").append(expressaoOriginal).append("\n");
@@ -111,6 +125,7 @@ public class Main extends JFrame {
 
             JexlEngine engine = new JexlBuilder().create();
             JexlExpression jexlExpr;
+
             try {
                 jexlExpr = engine.createExpression(expressao);
             } catch (Exception ex) {
@@ -118,11 +133,9 @@ public class Main extends JFrame {
                 return;
             }
 
-            for (int i = linhas - 1; i >= 0; i--) 
-            {
+            for (int i = linhas - 1; i >= 0; i--) {
                 Map<String, Object> contexto = new HashMap<>();
-                for (int j = 0; j < variaveis.size(); j++) 
-                {
+                for (int j = 0; j < variaveis.size(); j++) {
                     boolean valor = (i & (1 << (variaveis.size() - j - 1))) != 0;
                     contexto.put(variaveis.get(j), valor);
                     sb.append(valor ? "V" : "F").append("\t");
@@ -132,14 +145,34 @@ public class Main extends JFrame {
                     JexlContext jc = new MapContext(contexto);
                     Object evalObj = jexlExpr.evaluate(jc);
                     boolean resultado = evalObj instanceof Boolean ? (Boolean) evalObj : Boolean.parseBoolean(String.valueOf(evalObj));
+                    resultados.add(resultado);
                     sb.append("|\t").append(resultado ? "V" : "F").append("\n");
                 } catch (Exception ex) {
                     sb.append("|\tErro: ").append(ex.getMessage()).append("\n");
                 }
             }
 
+            // Classificação
+            String tipo;
+            Color cor;
+
+            if (resultados.stream().allMatch(r -> r)) {
+                tipo = "Tautologia";
+                cor = Color.GREEN.darker();
+            } else if (resultados.stream().allMatch(r -> !r)) {
+                tipo = "Contradição";
+                cor = Color.RED;
+            } else {
+                tipo = "Contingência";
+                cor = Color.ORANGE.darker();
+            }
+
+            resultadoLabel.setText("Classificação: " + tipo);
+            resultadoLabel.setForeground(cor);
+
             JTextArea ta = new JTextArea(sb.toString());
             ta.setEditable(false);
+            ta.setFont(new Font("Monospaced", Font.PLAIN, 12));
             ta.setColumns(60);
             ta.setRows(20);
             JScrollPane scroll = new JScrollPane(ta);
@@ -148,36 +181,31 @@ public class Main extends JFrame {
         });
     }
 
-        private static String SubstituirImplicacoes(String expr) 
-        {
-            String novaExpr = expr;
+    private static String SubstituirImplicacoes(String expr) {
+        String novaExpr = expr;
 
-            // marca implicações e bicondicionais com tokens temporários
-            novaExpr = novaExpr.replaceAll("<->", "@BICOND@");
-            novaExpr = novaExpr.replaceAll("->", "@IMPLICA@");
+        novaExpr = novaExpr.replaceAll("<->", "@BICOND@");
+        novaExpr = novaExpr.replaceAll("==", "@BICOND@");
+        novaExpr = novaExpr.replaceAll("->", "@IMPLICA@");
 
-            //expressões podem ter parênteses, entao foderemos com a droga do regex.
-            while (novaExpr.contains("@BICOND@")) 
-            {
-                novaExpr = novaExpr.replaceFirst(
-                    "(\\([^()]+\\)|[A-Z])\\s*@BICOND@\\s*(\\([^()]+\\)|[A-Z])",
-                    "($1 && $2) || (!($1) && !($2))"
-                );
-            }
-
-            while (novaExpr.contains("@IMPLICA@")) 
-            {
-                novaExpr = novaExpr.replaceFirst(
-                    "(\\([^()]+\\)|[A-Z])\\s*@IMPLICA@\\s*(\\([^()]+\\)|[A-Z])",
-                    "(!($1) || $2)"
-                );
-            }
-
-                return novaExpr;
+        while (novaExpr.contains("@BICOND@")) {
+            novaExpr = novaExpr.replaceFirst(
+                "(\\([^()]+\\)|[A-Za-z])\\s*@BICOND@\\s*(\\([^()]+\\)|[A-Za-z])",
+                "($1 && $2) || (!($1) && !($2))"
+            );
         }
 
-    public static void main(String[] args) 
-    {
+        while (novaExpr.contains("@IMPLICA@")) {
+            novaExpr = novaExpr.replaceFirst(
+                "(\\([^()]+\\)|[A-Za-z])\\s*@IMPLICA@\\s*(\\([^()]+\\)|[A-Za-z])",
+                "(!($1) || $2)"
+            );
+        }
+
+        return novaExpr;
+    }
+
+    public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             Main janela = new Main();
             janela.setVisible(true);
